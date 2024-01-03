@@ -27,7 +27,8 @@ setup(
             'test00 = pothole.test00:main',
             'grid = pothole.grid:main',
             'yolo = pothole.yolo:main',
-            'movnav = pothole.movnav:main'
+            'movnav = pothole.movnav:main',
+            'ff = pothole.ff:main'
         ],
     },
 )
