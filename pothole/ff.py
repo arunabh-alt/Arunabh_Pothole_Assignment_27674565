@@ -105,3 +105,37 @@ class ContourDetectionNode(Node):
         u, v = pixel
         ray = camera_model.projectPixelTo3dRay((u, v))
         return Point(x=ray[0], y=ray[1], z=ray[2])
+    def get_contour_center(self, contour):
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            return (cX, cY)
+        else:
+            return None
+
+    def camera_info_callback(self, msg):
+        if not self.camera_model:
+            self.camera_model = image_geometry.PinholeCameraModel()
+        self.camera_model.fromCameraInfo(msg)
+
+    def get_counts_over_time(self):
+        return self.counts_over_time
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    contour_detection_node = ContourDetectionNode()
+
+    rclpy.spin(contour_detection_node)
+
+    counts_over_time = contour_detection_node.get_counts_over_time()
+    print(counts_over_time)
+
+    contour_detection_node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
+
