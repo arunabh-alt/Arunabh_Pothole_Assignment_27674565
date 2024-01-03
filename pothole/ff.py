@@ -1,36 +1,47 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-from rclpy import qos
-from sensor_msgs.msg import CameraInfo, PointCloud2
+from rclpy.qos import qos_profile_sensor_data
 import image_geometry
+from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import Point
 
 class ContourDetectionNode(Node):
     camera_model = None
     cumulative_count = 0
+
     def __init__(self):
         super().__init__('contour_detection_node')
+
+        # Subscriptions for camera image and camera info
         self.subscription = self.create_subscription(Image, '/limo/depth_camera_link/image_raw', 
-                                                self.image_callback, qos_profile=qos.qos_profile_sensor_data)
+                                                    self.image_callback, qos_profile=qos_profile_sensor_data)
         self.camera_info_sub = self.create_subscription(CameraInfo, '/limo/depth_camera_link/camera_info',
-                                                self.camera_info_callback, 
-                                                qos_profile=qos.qos_profile_sensor_data)
-        self.subscription
+                                                        self.camera_info_callback, 
+                                                        qos_profile=qos_profile_sensor_data)
+
+        # Subscription for the occupancy grid map
+        self.occupancy_grid_sub = self.create_subscription(OccupancyGrid, '/map', self.occupancy_grid_callback, 10)
 
         self.cv_bridge = CvBridge()
 
-        # Initialize previous contours
-        self.previous_potholes = []
-        self.pothole_id = 0
-        # self.tracker = cv2.TrackerGOTURN_create()
-        # self.tracker.read('goturn.prototxt')
+        # Initialize variables to accumulate counts
+        self.counts_over_time = []
+        self.tracker = cv2.TrackerKCF_create()
+        self.current_potholes = []
+
+        # Occupancy grid map
+        self.occupancy_grid = None
+
+    def occupancy_grid_callback(self, msg):
+        # Store the occupancy grid map for later use
+        self.occupancy_grid = msg
 
     def image_callback(self, msg):
         try:
-            # Convert ROS Image message to OpenCV image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
             self.get_logger().info(f'Error converting image: {str(e)}')
@@ -42,90 +53,55 @@ class ContourDetectionNode(Node):
         # Display the result
         cv2.imshow('Magenta Contours', result)
         cv2.waitKey(1)
-    
-    def camera_info_callback(self, msg):
-        if not self.camera_model:
-            self.camera_model = image_geometry.PinholeCameraModel()
-        self.camera_model.fromCameraInfo(msg) 
-        camera_matrix = msg.k
-        distortion_coefficients = msg.d
 
-        # Print or use camera info data as per your requirement
-        self.get_logger().info(f'Camera Info - Camera Matrix: {camera_matrix}, Distortion Coefficients: {distortion_coefficients}')
-    
     def detect_magenta_contours(self, image):
-        # Convert the image from BGR to HSV color space
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        if self.occupancy_grid is None:
+            self.get_logger().warn('Occupancy grid not available. Skipping contour detection.')
+            return image
 
-        # Define the lower and upper bounds for magenta color in HSV
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_magenta = np.array([140, 50, 50])
         upper_magenta = np.array([170, 255, 255])
-
-        # Threshold the image to obtain the magenta color regions
         mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
-
-        # Find contours in the binary mask
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Filter contours based on area or other criteria if needed
         filtered_contours = []
         for contour in contours:
-            if cv2.contourArea(contour) > 10:
+            # Check if the contour is within certain areas in the occupancy grid
+            if self.is_contour_in_valid_area(contour):
                 filtered_contours.append(contour)
 
-        # Draw the contours on the original image
-        result = image.copy()
+        # Rest of your code for processing filtered contours...
 
-        # Accumulated contours
-        accumulated_contours = []
-        
-        for contour in filtered_contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            
-            # Check if the (x, y) position is the same as previous contours
-            if self.is_duplicate_contour(x, y):
-                continue
-            
-            # Add the contour coordinates to the accumulated contours
-            accumulated_contours.append((x, y))
-            
-            # Draw the contour
-            cv2.drawContours(result, [contour], -1, (0, 255, 0), 2)
-            
-            # Increment the cumulative count
-            self.cumulative_count += 1
+    def is_contour_in_valid_area(self, contour):
+        # Check if the contour falls within valid areas in the occupancy grid
+        if self.occupancy_grid is not None:
+            for point in contour:
+                # Convert contour point to map coordinates
+                map_point = self.map_coordinates_from_pixel(point[0], self.camera_model)
+                
+                # Check if the map point is within a valid area in the occupancy grid
+                if not self.is_point_in_valid_area(map_point):
+                    return False
 
-            # Display the cumulative count
-            cv2.putText(result, str(self.cumulative_count),
-                        (x, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        return True
 
-        # Store the current frame's contours as previous contours for the next frame
-        self.previous_potholes = accumulated_contours
+    def is_point_in_valid_area(self, map_point):
+        # Placeholder logic for simplicity
+        if self.occupancy_grid is not None:
+            # Assuming occupancy_grid is a 2D array where each cell represents occupancy (0 for free, 100 for occupied)
+            # You may need to adapt this based on the actual structure of your occupancy grid
+            x_index = int(map_point.x)
+            y_index = int(map_point.y)
 
-        # Display the total count of unique contours
-        print(f"Accumulated Contours: {self.cumulative_count}")
+            if 0 <= x_index < len(self.occupancy_grid) and 0 <= y_index < len(self.occupancy_grid[0]):
+                # Check if the cell is not occupied
+                return self.occupancy_grid[x_index][y_index] == 0
 
-        return result
+        return False  # Default to False if occupancy grid is not available or point is outside grid
 
-    def is_duplicate_contour(self, x, y):
-        for prev_x, prev_y in self.previous_potholes:
-            # Check if the (x, y) position is the same as previous contours within a threshold
-            if abs(x - prev_x) < 10 and abs(y - prev_y) < 10:
-                return True
-        return False
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = ContourDetectionNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-
-    node.destroy_node()
-    rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
+    def map_coordinates_from_pixel(self, pixel, camera_model):
+        # Placeholder logic for simplicity
+        u, v = pixel
+        ray = camera_model.projectPixelTo3dRay((u, v))
+        return Point(x=ray[0], y=ray[1], z=ray[2])
