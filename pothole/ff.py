@@ -5,6 +5,7 @@ from cv_bridge import CvBridge
 import cv2
 import numpy as np
 from std_msgs.msg import Int32
+import hashlib
 from rclpy.qos import qos_profile_sensor_data
 import image_geometry
 
@@ -26,6 +27,7 @@ class ContourDetectionNode(Node):
         self.counts_over_time = []
         self.tracker = cv2.TrackerKCF_create()
         self.current_potholes = []
+        self.occupancy_grid = np.zeros((500, 500), dtype=np.uint8)  # Adjust the grid size as needed
 
     def image_callback(self, msg):
         try:
@@ -41,24 +43,16 @@ class ContourDetectionNode(Node):
         cv2.imshow('Magenta Contours', result)
         cv2.waitKey(1)
         if len(self.counts_over_time) > 0:
-                counts_msg = Int32()
-                counts_msg.data = self.counts_over_time[-1]
-                self.counts_publisher.publish(counts_msg)
+            counts_msg = Int32()
+            counts_msg.data = self.counts_over_time[-1]
+            self.counts_publisher.publish(counts_msg)
 
     def detect_magenta_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_magenta = np.array([0, 0, 47])
-        upper_magenta = np.array([15, 15, 57])
+        lower_magenta = np.array([140, 50, 50])
+        upper_magenta = np.array([170, 255, 255])
         mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        filtered_contours = []
-        for contour in contours:
-            # Calculate the contour area dynamically based on the length of the contour
-            contour_area = cv2.contourArea(contour)
-            contour_length = cv2.arcLength(contour, True)
-            if contour_area > 0.8 * contour_length:
-                filtered_contours.append(contour)
 
         result = image.copy()
         unique_pothole_numbers = set()
@@ -70,8 +64,8 @@ class ContourDetectionNode(Node):
         for pothole in self.current_potholes:
             pothole['tracked'] = False
 
-        if filtered_contours:
-            for contour in filtered_contours:
+        if contours:
+            for contour in contours:
                 area = cv2.contourArea(contour)
 
                 if area > 1300:
@@ -79,27 +73,36 @@ class ContourDetectionNode(Node):
 
                     found = False
                     for pothole in self.current_potholes:
-                        if cv2.matchShapes(contour, pothole['contour'], cv2.CONTOURS_MATCH_I2, 0.0) < 0.1:
+                        if cv2.matchShapes(contour, pothole['contour'], cv2.CONTOURS_MATCH_I2, 0.0) < 0.5:
                             found = True
                             pothole['tracked'] = True
                             break
 
                     if not found:
-                        # New pothole
-                        cv2.drawContours(result, [contour], -1, (0, 255, 0), 2)
+                        # Check against previously detected contours
+                        found_similar_contour = False
+                        for pothole in self.current_potholes:
+                            if cv2.matchShapes(contour, pothole['contour'], cv2.CONTOURS_MATCH_I2, 0.0) < 0.5:
+                                found_similar_contour = True
+                                break
 
-                        center = self.get_contour_center(contour)
+                        if not found_similar_contour:
+                            # New pothole
+                            unique_color = self.hash_color(str(contour))
+                            cv2.drawContours(result, [contour], -1, unique_color, 2)
 
-                        contours_count += 1
-                        pothole_number = contours_count + self.cumulative_count
+                            center = self.get_contour_center(contour)
 
-                        cv2.putText(result, str(pothole_number),
-                                    (center[0], center[1]),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                            contours_count += 1
+                            pothole_number = contours_count + self.cumulative_count
 
-                        unique_contours.add(contour_tuple)
-                        unique_pothole_numbers.add(pothole_number)
-                        self.current_potholes.append({'contour': contour, 'tracked': True})
+                            cv2.putText(result, str(pothole_number),
+                                        (center[0], center[1]),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+                            unique_contours.add(contour_tuple)
+                            unique_pothole_numbers.add(pothole_number)
+                            self.current_potholes.append({'contour': contour.copy(), 'tracked': True})
 
         for pothole in self.current_potholes:
             if not pothole['tracked']:
@@ -117,6 +120,7 @@ class ContourDetectionNode(Node):
 
         return result
 
+
     def get_contour_center(self, contour):
         M = cv2.moments(contour)
         if M["m00"] != 0:
@@ -126,10 +130,23 @@ class ContourDetectionNode(Node):
         else:
             return None
 
+    def get_grid_coordinates(self, point):
+        print(f"Original Point: {point}")
+        grid_x = int(point[0] / 10)  # Adjust grid cell size as needed
+        grid_y = int(point[1] / 10)
+        print(f"Grid Coordinates: ({grid_x}, {grid_y})")
+        return grid_x, grid_y
+
     def camera_info_callback(self, msg):
         if not self.camera_model:
             self.camera_model = image_geometry.PinholeCameraModel()
         self.camera_model.fromCameraInfo(msg)
+
+    def hash_color(self, text):
+        # Use a hash function to generate a consistent color from the contour's unique identifier
+        hashed = int(hashlib.sha256(text.encode('utf-8')).hexdigest(), 16)
+        color = (hashed % 256, (hashed // 256) % 256, (hashed // 65536) % 256)
+        return color
 
     def get_counts_over_time(self):
         return self.counts_over_time
