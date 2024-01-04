@@ -135,6 +135,11 @@ class ContourDetectionNode(Node):
 
     def get_counts_over_time(self):
         return self.counts_over_time
+    def publish_counts_callback(self):
+        if len(self.counts_over_time) > 0:
+            counts_msg = Int32()
+            counts_msg.data = self.counts_over_time[-1]
+            self.counts_publisher.publish(counts_msg)
 
 def main(args=None):
     rclpy.init(args=args)

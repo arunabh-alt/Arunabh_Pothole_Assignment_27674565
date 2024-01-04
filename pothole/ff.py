@@ -4,10 +4,9 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+from std_msgs.msg import Int32
 from rclpy.qos import qos_profile_sensor_data
 import image_geometry
-from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import Point
 
 class ContourDetectionNode(Node):
     camera_model = None
@@ -15,30 +14,18 @@ class ContourDetectionNode(Node):
 
     def __init__(self):
         super().__init__('contour_detection_node')
-
-        # Subscriptions for camera image and camera info
         self.subscription = self.create_subscription(Image, '/limo/depth_camera_link/image_raw', 
                                                     self.image_callback, qos_profile=qos_profile_sensor_data)
         self.camera_info_sub = self.create_subscription(CameraInfo, '/limo/depth_camera_link/camera_info',
                                                         self.camera_info_callback, 
                                                         qos_profile=qos_profile_sensor_data)
-
-        # Subscription for the occupancy grid map
-        self.occupancy_grid_sub = self.create_subscription(OccupancyGrid, '/map', self.occupancy_grid_callback, 10)
-
+        
         self.cv_bridge = CvBridge()
-
+        self.counts_publisher = self.create_publisher(Int32, 'counts_over_time', 10)
         # Initialize variables to accumulate counts
         self.counts_over_time = []
         self.tracker = cv2.TrackerKCF_create()
         self.current_potholes = []
-
-        # Occupancy grid map
-        self.occupancy_grid = None
-
-    def occupancy_grid_callback(self, msg):
-        # Store the occupancy grid map for later use
-        self.occupancy_grid = msg
 
     def image_callback(self, msg):
         try:
@@ -53,58 +40,83 @@ class ContourDetectionNode(Node):
         # Display the result
         cv2.imshow('Magenta Contours', result)
         cv2.waitKey(1)
+        if len(self.counts_over_time) > 0:
+                counts_msg = Int32()
+                counts_msg.data = self.counts_over_time[-1]
+                self.counts_publisher.publish(counts_msg)
 
     def detect_magenta_contours(self, image):
-        if self.occupancy_grid is None:
-            self.get_logger().warn('Occupancy grid not available. Skipping contour detection.')
-            return image
-
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_magenta = np.array([140, 50, 50])
-        upper_magenta = np.array([170, 255, 255])
+        lower_magenta = np.array([0, 0, 47])
+        upper_magenta = np.array([15, 15, 57])
         mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         filtered_contours = []
         for contour in contours:
-            # Check if the contour is within certain areas in the occupancy grid
-            if self.is_contour_in_valid_area(contour):
+            # Calculate the contour area dynamically based on the length of the contour
+            contour_area = cv2.contourArea(contour)
+            contour_length = cv2.arcLength(contour, True)
+            if contour_area > 0.8 * contour_length:
                 filtered_contours.append(contour)
 
-        # Rest of your code for processing filtered contours...
+        result = image.copy()
+        unique_pothole_numbers = set()
+        contours_count = 0
+        unique_contours = set()
 
-    def is_contour_in_valid_area(self, contour):
-        # Check if the contour falls within valid areas in the occupancy grid
-        if self.occupancy_grid is not None:
-            for point in contour:
-                # Convert contour point to map coordinates
-                map_point = self.map_coordinates_from_pixel(point[0], self.camera_model)
-                
-                # Check if the map point is within a valid area in the occupancy grid
-                if not self.is_point_in_valid_area(map_point):
-                    return False
+        potholes_to_remove = []
 
-        return True
+        for pothole in self.current_potholes:
+            pothole['tracked'] = False
 
-    def is_point_in_valid_area(self, map_point):
-        # Placeholder logic for simplicity
-        if self.occupancy_grid is not None:
-            # Assuming occupancy_grid is a 2D array where each cell represents occupancy (0 for free, 100 for occupied)
-            # You may need to adapt this based on the actual structure of your occupancy grid
-            x_index = int(map_point.x)
-            y_index = int(map_point.y)
+        if filtered_contours:
+            for contour in filtered_contours:
+                area = cv2.contourArea(contour)
 
-            if 0 <= x_index < len(self.occupancy_grid) and 0 <= y_index < len(self.occupancy_grid[0]):
-                # Check if the cell is not occupied
-                return self.occupancy_grid[x_index][y_index] == 0
+                if area > 1300:
+                    contour_tuple = tuple(contour.flatten())
 
-        return False  # Default to False if occupancy grid is not available or point is outside grid
+                    found = False
+                    for pothole in self.current_potholes:
+                        if cv2.matchShapes(contour, pothole['contour'], cv2.CONTOURS_MATCH_I2, 0.0) < 0.1:
+                            found = True
+                            pothole['tracked'] = True
+                            break
 
-    def map_coordinates_from_pixel(self, pixel, camera_model):
-        # Placeholder logic for simplicity
-        u, v = pixel
-        ray = camera_model.projectPixelTo3dRay((u, v))
-        return Point(x=ray[0], y=ray[1], z=ray[2])
+                    if not found:
+                        # New pothole
+                        cv2.drawContours(result, [contour], -1, (0, 255, 0), 2)
+
+                        center = self.get_contour_center(contour)
+
+                        contours_count += 1
+                        pothole_number = contours_count + self.cumulative_count
+
+                        cv2.putText(result, str(pothole_number),
+                                    (center[0], center[1]),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+                        unique_contours.add(contour_tuple)
+                        unique_pothole_numbers.add(pothole_number)
+                        self.current_potholes.append({'contour': contour, 'tracked': True})
+
+        for pothole in self.current_potholes:
+            if not pothole['tracked']:
+                # Pothole disappeared
+                potholes_to_remove.append(pothole)
+
+        for pothole in potholes_to_remove:
+            self.current_potholes.remove(pothole)
+
+        total_pothole = len(unique_pothole_numbers)
+        print(total_pothole + self.cumulative_count)
+
+        self.cumulative_count += contours_count
+        self.counts_over_time.append(self.cumulative_count)
+
+        return result
+
     def get_contour_center(self, contour):
         M = cv2.moments(contour)
         if M["m00"] != 0:
@@ -137,5 +149,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-

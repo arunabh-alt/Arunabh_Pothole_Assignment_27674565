@@ -45,7 +45,7 @@ class ObstacleAvoidanceAndPositionTracking(rclpy.node.Node):
 
         if min_distance < 0.55:  # Threshold distance for obstacle detection
             self.twist.linear.x = 0.0  # Stop forward motion
-            self.twist.angular.z = -0.7  # Rotate to avoid obstacle
+            self.twist.angular.z = -0.8  # Rotate to avoid obstacle
         else:
             self.twist.linear.x = 0.5  # Move forward
             self.twist.angular.z = 0.4  # No rotation

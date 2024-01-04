@@ -4,6 +4,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+from std_msgs.msg import Int32
 from rclpy.qos import qos_profile_sensor_data
 import image_geometry
 
@@ -20,7 +21,7 @@ class ContourDetectionNode(Node):
                                                         qos_profile=qos_profile_sensor_data)
         
         self.cv_bridge = CvBridge()
-
+        self.counts_publisher = self.create_publisher(Int32, 'counts_over_time', 10)
         # Initialize variables to accumulate counts
         self.counts_over_time = []
         self.tracker = cv2.TrackerKCF_create()
@@ -39,6 +40,10 @@ class ContourDetectionNode(Node):
         # Display the result
         cv2.imshow('Magenta Contours', result)
         cv2.waitKey(1)
+        if len(self.counts_over_time) > 0:
+                counts_msg = Int32()
+                counts_msg.data = self.counts_over_time[-1]
+                self.counts_publisher.publish(counts_msg)
 
     def detect_magenta_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -69,7 +74,7 @@ class ContourDetectionNode(Node):
             for contour in filtered_contours:
                 area = cv2.contourArea(contour)
 
-                if area > 1000:
+                if area > 1300:
                     contour_tuple = tuple(contour.flatten())
 
                     found = False
