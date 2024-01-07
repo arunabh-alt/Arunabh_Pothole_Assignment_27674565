@@ -45,10 +45,12 @@ class ContourDetectionNode(Node):
                 counts_msg.data = self.counts_over_time[-1]
                 self.counts_publisher.publish(counts_msg)
 
+       
+
     def detect_magenta_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_magenta = np.array([140, 50, 50])
-        upper_magenta = np.array([170, 255, 255])
+        lower_magenta = np.array([0, 0, 47])
+        upper_magenta = np.array([15, 15, 57])
         mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -74,32 +76,23 @@ class ContourDetectionNode(Node):
             for contour in filtered_contours:
                 area = cv2.contourArea(contour)
 
-                if area > 1300:
-                    contour_tuple = tuple(contour.flatten())
+                #if area > 1000:
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(result, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-                    found = False
-                    for pothole in self.current_potholes:
-                        if cv2.matchShapes(contour, pothole['contour'], cv2.CONTOURS_MATCH_I2, 0.0) < 0.1:
-                            found = True
-                            pothole['tracked'] = True
-                            break
+                center = self.get_contour_center(contour)
 
-                    if not found:
-                        # New pothole
-                        cv2.drawContours(result, [contour], -1, (0, 255, 0), 2)
+                contours_count += 1
+                pothole_number = contours_count + self.cumulative_count
 
-                        center = self.get_contour_center(contour)
+                cv2.putText(result, str(pothole_number),
+                            (center[0], center[1]),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-                        contours_count += 1
-                        pothole_number = contours_count + self.cumulative_count
+                unique_contours.add(tuple(contour.flatten()))
+                unique_pothole_numbers.add(pothole_number)
+                self.current_potholes.append({'contour': contour, 'tracked': True})
 
-                        cv2.putText(result, str(pothole_number),
-                                    (center[0], center[1]),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-                        unique_contours.add(contour_tuple)
-                        unique_pothole_numbers.add(pothole_number)
-                        self.current_potholes.append({'contour': contour, 'tracked': True})
 
         for pothole in self.current_potholes:
             if not pothole['tracked']:
@@ -133,19 +126,20 @@ class ContourDetectionNode(Node):
 
     def get_counts_over_time(self):
         return self.counts_over_time
+    def publish_counts_callback(self):
+        if len(self.counts_over_time) > 0:
+            counts_msg = Int32()
+            counts_msg.data = self.counts_over_time[-1]
+            self.counts_publisher.publish(counts_msg)
 
 def main(args=None):
     rclpy.init(args=args)
-
     contour_detection_node = ContourDetectionNode()
-
+    # Set a timer to publish counts every 1 second (adjust as needed)
+    timer_period = 1.0  # seconds
+    contour_detection_node.create_timer(timer_period, contour_detection_node.publish_counts_callback)
     rclpy.spin(contour_detection_node)
-
-    counts_over_time = contour_detection_node.get_counts_over_time()
-    print(counts_over_time)
-
     contour_detection_node.destroy_node()
     rclpy.shutdown()
-
 if __name__ == '__main__':
     main()

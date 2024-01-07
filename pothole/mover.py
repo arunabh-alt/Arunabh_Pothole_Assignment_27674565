@@ -33,33 +33,31 @@ class DepthCameraSubscriber(Node):
             self.get_logger().error(f"Error converting depth image: {e}")
             return
         
-        hsv_image = cv2.cvtColor(depth_image, cv2.COLOR_BGR2HSV)
+        hsv_image = cv2.cvtColor(image_color, cv2.COLOR_BGR2HSV)
 
-        # Define lower and upper bounds for magenta color in HSV
-        lower_magenta = np.array([140, 100, 100])
-        upper_magenta = np.array([170, 255, 255])
+        # Define lower and upper bounds for greycolor in HSV
+        lower_grey = np.array([0, 0, 47])
+        upper_grey = np.array([15, 15, 70])
 
-        # Create binary mask for magenta color
-        magenta_mask = cv2.inRange(hsv_image, lower_magenta, upper_magenta)
-        V= cv2.moments(magenta_mask)
+        # Create binary mask for grey color
+        grey_mask = cv2.inRange(hsv_image, lower_grey, upper_grey)
+        V= cv2.moments(grey_mask)
         if V["m00"] == 0:
             print("Blank space")
         # Find contours
         else:
-            contours, _ = cv2.findContours(magenta_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            #contours, _ = cv2.findContours(depth_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(grey_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            # Create an image to draw the contours
-            depth_image_contours = np.zeros_like(magenta_mask)
-            color_image_contours = np.zeros_like(magenta_mask)
-            
+            # Create an image to draw the contours (color image)
+            color_image_contours = np.copy(image_color)
+
             for i, contour in enumerate(contours):
                 # Calculate the size of the contour
                 contour_size = cv2.contourArea(contour)
                 
-                # Draw the contour on the image
-                cv2.drawContours(depth_image_contours, [contour], -1, 255, 2)
-                cv2.drawContours(color_image_contours, [contour], -1, 255, 2)
+                # Draw the contour on the color image
+                cv2.drawContours(color_image_contours, [contour], -1, (0, 255, 0), 2)
+
                 # Calculate the center of the contour
                 M = cv2.moments(contour)
                 if M["m00"] == 0:
@@ -68,24 +66,21 @@ class DepthCameraSubscriber(Node):
                     cx = int(M['m10'] / M['m00'])
                     cy = int(M['m01'] / M['m00'])
                     image_coords = (cx, cy)
+                    
                     # Draw a circle around the contour
-                    cv2.circle(color_image_contours, (int(image_coords[1]), int(image_coords[0])), 10, 255, -1)
-                    cv2.circle(depth_image_contours, (cx, cy), radius=10, color=255, thickness=-1)
+                    cv2.circle(color_image_contours, (cx, cy), 10, (0, 0, 255), -1)
                     
                     # Draw the contour count and size inside the circle
                     text = f"{i+1}: Size={contour_size:.2f}"
                     text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, thickness=2)
                     text_x = cx - text_size[0] // 2
                     text_y = cy + text_size[1] // 2
-                    cv2.putText(depth_image_contours, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=0, thickness=2)
-                    cv2.putText(color_image_contours, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=0, thickness=2)
+                    #cv2.putText(color_image_contours, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=2)
 
-            # Display the image with contours
-            color_image_contours = cv2.resize(image_color, (0,0), fx=0.8, fy=0.8)        
-            cv2.imshow("Contours", depth_image_contours)
+            # Display the color image with contours
             cv2.imshow("Color Contours", color_image_contours)
             cv2.waitKey(1)
-        
+            
         
 
 

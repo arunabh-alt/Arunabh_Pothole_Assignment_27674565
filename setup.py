@@ -20,12 +20,12 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'object_detector = pothole.object_detector:main',
+            'real_object_detector = pothole.real_object_detector:main',
             'mover = pothole.mover:main',
             'test = pothole.test:main',
             'mover2 = pothole.mover2:main',
             'test00 = pothole.test00:main',
-            'grid = pothole.grid:main',
+            'magenta_pothole = pothole.magenta_pothole:main',
             'yolo = pothole.yolo:main',
             'movnav = pothole.movnav:main',
             'ff = pothole.ff:main'
