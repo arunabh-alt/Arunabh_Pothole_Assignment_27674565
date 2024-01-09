@@ -28,6 +28,7 @@ To explore the codebase and run the assignment, follow these steps:
 2. **Clone the Repository:**
    ```bash
    git clone https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565.git
+3. **Make sure clone the repo on your folder's src directory**   
 ### Build the package:
     colcon build --symlink-Install
 ### Create a new terminal , and run the command:  
