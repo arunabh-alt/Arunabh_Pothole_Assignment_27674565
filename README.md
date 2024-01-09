@@ -22,13 +22,15 @@ The `object_detector` file specializes in detecting real-world potholes. It leve
 
 To explore the codebase and run the assignment, follow these steps:
 
-1.Install ROS2 in your Ubuntu 22.04 System 
-2.Clone the repository:
+
+1. **Install ROS2 on your Ubuntu 22.04 System**
+
+2. **Clone the Repository:**
    ```bash
    git clone https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565.git
-3.Build the package:
+### Build the package:
     ```bash
     colcon build --symlink-Install
-4.Create a new terminal , and run the command:
+### Create a new terminal , and run the command:
     ```bash  
     source install\setup.bash  
