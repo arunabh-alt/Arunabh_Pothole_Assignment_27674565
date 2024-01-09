@@ -4,7 +4,7 @@ This repository contains the source code for my robotics programming assignment,
 ## Table of Contents
 
 1. [Wiki](#wiki)
-2. [Project Structure](##project-structure)
+2. [Project Structure](#project-structure)
 3. [Getting Started](#getting-started)
 4. [Contributing](#contributing)
 
