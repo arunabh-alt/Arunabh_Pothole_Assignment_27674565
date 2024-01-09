@@ -1,6 +1,7 @@
 # Robotics Programming Assignment
 
-This repository contains the source code for my robotics programming assignment, implemented in Python. The assignment focuses on the pothole detection by LIMO robot for road inspection performance evaluation.
+
+This repository hosts the source code for my robotics programming assignment, implemented in Python. The assignment specifically addresses pothole detection using the LIMO robot, contributing to the evaluation of road inspection performance.
 ## Table of Contents
 
 1. [Wiki](#wiki)
