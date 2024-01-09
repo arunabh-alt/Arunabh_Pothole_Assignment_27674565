@@ -24,11 +24,11 @@ To explore the codebase and run the assignment, follow these steps:
 
 
 1. **Install ROS2 on your Ubuntu 22.04 System**
-
-2. **Clone the Repository:**
+2. **Create a folder (e.g- `assignment_limo`) and then make a directory name `src` ** 
+3. **Clone the Repository to the `src` folder:**
    ```bash
    git clone https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565.git
-3. **Make sure clone the repo on your folder's src directory**   
+  
 ### Build the package:
     colcon build --symlink-Install
 ### Create a new terminal , and run the command:  
