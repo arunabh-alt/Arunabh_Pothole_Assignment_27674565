@@ -1,100 +1,121 @@
-import cv2
-import numpy as np
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import LaserScan, CameraInfo
+from geometry_msgs.msg import Twist, PoseStamped
+from std_msgs.msg import Int32
+from nav_msgs.msg import Odometry
 from rclpy import qos
+from sensor_msgs.msg import PointCloud2
 import image_geometry
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2
-from cv_bridge import CvBridge, CvBridgeError
-class DepthCameraSubscriber(Node):
+
+class ObstacleAvoidanceAndPositionTracking(rclpy.node.Node):
+    camera_model = None
+
     def __init__(self):
-        super().__init__('depth_camera_subscriber')
+        super().__init__('obstacle_avoidance_and_position_tracking')
+
+        # Subscriptions for laser scan, position data, and pothole count
+        self.scan_subscription = self.create_subscription(LaserScan, 'scan', self.scan_callback, 10)
         self.camera_info_sub = self.create_subscription(CameraInfo, '/limo/depth_camera_link/camera_info',
                                                 self.camera_info_callback, 
                                                 qos_profile=qos.qos_profile_sensor_data)
+        self.position_subscription = self.create_subscription(Odometry, '/odom', self.odometry_callback, 10)
         
-        #self.object_location_pub = self.create_publisher(PoseStamped, '/limo/object_location', 10)
+        # Subscriber for pothole count
+        self.pothole_count_subscription = self.create_subscription(Int32, 'counts_over_time', self.pothole_count_callback, 10)
 
-        self.image_sub = self.create_subscription(Image, '/limo/depth_camera_link/image_raw', 
-                                                self.depth_callback, qos_profile=qos.qos_profile_sensor_data)
-        self.cv_bridge = CvBridge()
-        self.camera_model = None
+        # Publisher for velocity commands
+        self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+
+        # Variables for position tracking and pothole counting
+        self.starting_position = None
+        self.positions = []
+
+        # Twist message for velocity commands
+        self.twist = Twist()
+        self.initial_position = None
+        self.is_initial_position_reached = False
+
+        # Declare parameter only once in the constructor
+        self.declare_parameter("total_pothole_count", 0)
+        self.initial_movement_timer = self.create_timer(10.0, self.stop_initial_movement)
+
+    def scan_callback(self, msg):
+        min_distance = min(msg.ranges[int(len(msg.ranges)/2) -10 : int(len(msg.ranges)/2) +10])
+
+        if min_distance < 0.55:  # Threshold distance for obstacle detection
+            self.twist.linear.x = 0.0  # Stop forward motion
+            self.twist.angular.z = -0.8  # Rotate to avoid obstacle
+        else:
+            self.twist.linear.x = 0.5  # Move forward
+            self.twist.angular.z = 0.4  # No rotation
+
+        self.publisher.publish(self.twist)
+
+        if self.initial_position is None:
+            self.initial_position = self.get_current_position()
+
+    def odometry_callback(self, msg):
+        if hasattr(self, 'current_position'):
+            # Check if initial movement has completed
+            if len(self.positions) == 0:
+                self.positions.append(msg.pose.pose)
+            else:
+                # Only append positions after the initial movement
+                if self.distance_between_poses(msg.pose.pose, self.positions[-1]) > 0.05:
+                    self.positions.append(msg.pose.pose)
+
+                # Now you can check if the current position is close to the initial position
+                if self.distance_between_poses(msg.pose.pose, self.initial_position) < 0.05:
+                    if not self.is_initial_position_reached:
+                        self.get_logger().info("Robot is back at the initial position")
+                        self.is_initial_position_reached = True
+                    self.twist.linear.x = 0.0
+                    self.twist.angular.z= 0.0
+                elif self.is_initial_position_reached:
+                    self.is_initial_position_reached = False  # Reset the flag when the robot moves away from the initial position
+        else:
+            # Store initial position during initial movement
+            self.current_position = msg.pose.pose
+
+    def distance_between_poses(self, pose1, pose2):
+        # Check if either pose is None
+        if pose1 is None or pose2 is None:
+            return float('inf')  # or any large value to indicate infinite distance
+
+        # Check if the 'position' attribute is present in the poses
+        if hasattr(pose1, 'position') and hasattr(pose2, 'position'):
+            # Calculate the Euclidean distance between two Pose objects
+            return ((pose1.position.x - pose2.position.x)**2 +
+                    (pose1.position.y - pose2.position.y)**2 +
+                    (pose1.position.z - pose2.position.z)**2)**0.5
+        else:
+            return float('inf')
+
+    def get_current_position(self):
+        return self.current_position
+
     def camera_info_callback(self, msg):
         if not self.camera_model:
             self.camera_model = image_geometry.PinholeCameraModel()
         self.camera_model.fromCameraInfo(msg)
-    def depth_callback(self, msg):
-        try:
-            image_color = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
-            depth_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-        except Exception as e:
-            self.get_logger().error(f"Error converting depth image: {e}")
-            return
-        
-        hsv_image = cv2.cvtColor(image_color, cv2.COLOR_BGR2HSV)
 
-        # Define lower and upper bounds for greycolor in HSV
-        lower_grey = np.array([0, 0, 47])
-        upper_grey = np.array([15, 15, 70])
+    def pothole_count_callback(self, msg):
+        total_pothole_count = msg.data
+        if self.is_initial_position_reached:
+            self.get_logger().info(f'Total Potholes Detected: {total_pothole_count}')
 
-        # Create binary mask for grey color
-        grey_mask = cv2.inRange(hsv_image, lower_grey, upper_grey)
-        V= cv2.moments(grey_mask)
-        if V["m00"] == 0:
-            print("Blank space")
-        # Find contours
-        else:
-            contours, _ = cv2.findContours(grey_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # Create an image to draw the contours (color image)
-            color_image_contours = np.copy(image_color)
-
-            for i, contour in enumerate(contours):
-                # Calculate the size of the contour
-                contour_size = cv2.contourArea(contour)
-                
-                # Draw the contour on the color image
-                cv2.drawContours(color_image_contours, [contour], -1, (0, 255, 0), 2)
-
-                # Calculate the center of the contour
-                M = cv2.moments(contour)
-                if M["m00"] == 0:
-                    print('No pothole has been detected.')
-                else:    
-                    cx = int(M['m10'] / M['m00'])
-                    cy = int(M['m01'] / M['m00'])
-                    image_coords = (cx, cy)
-                    
-                    # Draw a circle around the contour
-                    cv2.circle(color_image_contours, (cx, cy), 10, (0, 0, 255), -1)
-                    
-                    # Draw the contour count and size inside the circle
-                    text = f"{i+1}: Size={contour_size:.2f}"
-                    text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, thickness=2)
-                    text_x = cx - text_size[0] // 2
-                    text_y = cy + text_size[1] // 2
-                    #cv2.putText(color_image_contours, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=2)
-
-            # Display the color image with contours
-            cv2.imshow("Color Contours", color_image_contours)
-            cv2.waitKey(1)
-            
-        
-
+    def stop_initial_movement(self):
+        # Stop the initial movement after 10 seconds
+        self.initial_movement_timer.cancel()
 
 
 def main(args=None):
     rclpy.init(args=args)
-
-    depth_camera_subscriber = DepthCameraSubscriber()
-
-    rclpy.spin(depth_camera_subscriber)
-
-    depth_camera_subscriber.destroy_node()
+    obstacle_avoidance_and_position_tracking = ObstacleAvoidanceAndPositionTracking()
+    rclpy.spin(obstacle_avoidance_and_position_tracking)
+    obstacle_avoidance_and_position_tracking.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
