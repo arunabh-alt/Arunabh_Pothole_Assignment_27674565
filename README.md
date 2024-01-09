@@ -3,9 +3,10 @@
 This repository contains the source code for my robotics programming assignment, implemented in Python. The assignment focuses on the pothole detection by LIMO robot for road inspection performance evaluation.
 ## Table of Contents
 
-- [Wiki](#wiki)
-- [Getting Started](#getting-started)
-- [Contributing](#contributing)
+1. [Wiki](#wiki)
+2. [Project Structure](##project-structure)
+3. [Getting Started](#getting-started)
+4. [Contributing](#contributing)
 
 ## Wiki
 
@@ -25,7 +26,7 @@ The `magenta_pothole` file is designed to detect simple potholes within a contro
 
 ### 2. object_detector
 
-The `object_detector` file specializes in detecting real-world potholes. It leverages Python programming and ROS2 to identify and analyze potholes in a broader context.
+The `real_object_detector` file specializes in detecting real-world potholes. It leverages Python programming and ROS2 to identify and analyze potholes in a broader context.
 
 ## Getting Started
 
