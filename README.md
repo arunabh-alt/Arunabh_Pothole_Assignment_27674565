@@ -34,5 +34,5 @@ To explore the codebase and run the assignment, follow these steps:
 ### Create a new terminal , and run the command: 
     cd assignment_limo
     source install\setup.bash  
-### Run the node
+### Launch the Gazebo simulation
     ros2 run package_name node_name
