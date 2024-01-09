@@ -25,7 +25,7 @@ The core functionality of the assignment is implemented through Python-based ROS
 
 The `magenta_pothole` file is designed to detect simple potholes within a controlled environment. This file can count pothole, determine the sizes of potholes. This module focuses on identifying potholes in a specific setting.
 
-### 2. object_detector
+### 2. real_object_detector
 
 The `real_object_detector` file specializes in detecting and counting real-world potholes. It leverages Python programming and ROS2 to identify and analyze potholes in a broader context.
 
