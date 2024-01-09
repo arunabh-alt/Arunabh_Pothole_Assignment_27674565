@@ -34,11 +34,11 @@ class ContourDetectionNode(Node):
             self.get_logger().info(f'Error converting image: {str(e)}')
             return
 
-        # Apply magenta color contour detection
-        result = self.detect_magenta_contours(cv_image)
+        # Apply grey color contour detection
+        result = self.detect_grey_contours(cv_image)
         
         # Display the result
-        cv2.imshow('Magenta Contours', result)
+        cv2.imshow('Potholes', result)
         cv2.waitKey(1)
         if len(self.counts_over_time) > 0:
                 counts_msg = Int32()
@@ -47,7 +47,7 @@ class ContourDetectionNode(Node):
 
        
 
-    def detect_magenta_contours(self, image):
+    def detect_grey_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_magenta = np.array([0, 0, 42])
         upper_magenta = np.array([15, 15, 57])
