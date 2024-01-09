@@ -1,8 +1,11 @@
+# Gazebo Simulation For Magenta Color Pothole Environment
 ros2 launch limo_gazebosim limo_gazebo_diff.launch.py world:=src/CMP9767_LIMO/assignment_template/worlds/potholes_simple.world
 
+# Gazebo Simulation For Real World Pothole Environment
+ros2 launch limo_gazebosim limo_gazebo_diff.launch.py world:=src/CMP9767_LIMO/assignment_template/worlds/potholes.world
+
+# Run the robot by keyboard
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
-        lower_color = np.array([0, 0, 47])  # Adjust as needed
-        upper_color = np.array([15, 15, 57])  # Adjust as needed
-
+#Rviz
 ros2 launch limo_navigation limo_navigation.launch.py use_sim_time:=true map:=src/CMP9767_LIMO/assignment_template/maps/potholes_20mm.yaml params_file:=src/CMP9767_LIMO/assignment_template/params/nav2_params.yaml
