@@ -1,10 +1,10 @@
 # Robotics Programming Assignment
 
-This repository contains the source code for my robotics programming assignment, implemented in Python. The assignment focuses on the LIMO robot for performance evaluation.
+This repository contains the source code for my robotics programming assignment, implemented in Python. The assignment focuses on the pothole detection by LIMO robot for road inspection performance evaluation.
 
 ## Project Structure
 
-The main codebase is organized in the `src/path/to/submodule` directory. For detailed specifications, refer to this path.
+The main code and packages are in the `src` folder. The `src` folder contains `pothole`,`resource`,`test` folders and `package.xml`, `setup.cfg`,`setup.py` files. Here the main project codebase are available in the `pothole` folder. The LIMO Robot codebase is organized in the `src/path/to/submodule` directory. For detailed specifications, refer to this path.
 
 ## ROS2-based Python Files
 
