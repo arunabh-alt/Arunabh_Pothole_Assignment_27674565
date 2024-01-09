@@ -1,6 +1,15 @@
 # Robotics Programming Assignment
 
 This repository contains the source code for my robotics programming assignment, implemented in Python. The assignment focuses on the pothole detection by LIMO robot for road inspection performance evaluation.
+## Table of Contents
+
+- [Wiki](#wiki)
+- [Getting Started](#getting-started)
+- [Contributing](#contributing)
+
+## Wiki
+
+Explore the detailed documentation and guidelines in the [Wiki](https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565/wiki/Magenta-Color-Pothole-Detection-Algorithm-Details).
 
 ## Project Structure
 
