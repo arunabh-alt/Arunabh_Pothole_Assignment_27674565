@@ -29,8 +29,9 @@ To explore the codebase and run the assignment, follow these steps:
    ```bash
    git clone https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565.git
 ### Build the package:
-    ```bash
     colcon build --symlink-Install
-### Create a new terminal , and run the command:
-    ```bash  
+### Create a new terminal , and run the command:  
     source install\setup.bash  
+### Run the node
+    cd <folder>
+    ros2 run package_name node_name
