@@ -9,7 +9,7 @@ This repository contains the source code for my robotics programming assignment,
 
 ## Wiki
 
-Explore the detailed documentation and guidelines in the [Wiki](https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565/wiki/Magenta-Color-Pothole-Detection-Algorithm-Details).
+Explore the detailed documentation and guidelines in the [Wiki](https://github.com/arunabh-alt/Arunabh_Pothole_Assignment_27674565/wiki).
 
 ## Project Structure
 
