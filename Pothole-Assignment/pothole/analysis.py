@@ -25,7 +25,7 @@ class PotholeAnalysisNode(Node):
 
     def size_callback(self, msg):
         size = msg.data
-        self.get_logger().info(f'Received Pothole Size: {size}')
+        self.get_logger().info(f'Received Pothole Size: {size} nm')
 
         # Analyze pothole size
         if size > 4000:
