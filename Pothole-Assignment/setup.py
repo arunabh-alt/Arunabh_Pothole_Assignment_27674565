@@ -22,9 +22,11 @@ setup(
         'console_scripts': [
             'real_object_detector = pothole.real_object_detector:main',
             'mover = pothole.mover:main',
+            'analysis = pothole.analysis:main',
             'test = pothole.test:main',
             'magenta_pothole = pothole.magenta_pothole:main',
-            'tes2 = pothole.test2:main'
+            'test2 = pothole.test2:main'
+            
             
         ],
     },

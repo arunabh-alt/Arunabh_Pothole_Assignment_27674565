@@ -8,7 +8,7 @@ from std_msgs.msg import Int32
 import hashlib
 from rclpy.qos import qos_profile_sensor_data
 import image_geometry
-
+import os
 
 class ContourDetectionNode(Node):
     camera_model = None
@@ -24,16 +24,22 @@ class ContourDetectionNode(Node):
         
         self.cv_bridge = CvBridge()
         self.counts_publisher = self.create_publisher(Int32, 'counts_over_time', 10)
-        self.size_publisher=self.create_publisher(Int32, 'size_real_time',10)
         # Initialize variables to accumulate counts
         self.counts_over_time = []
-        self.size_real_time = []
         self.tracker = cv2.TrackerKCF_create()
         self.current_potholes = []
         self.occupancy_grid = np.zeros((500, 500), dtype=np.uint8)  # Adjust the grid size as needed
-        
+        #self.pothole_file = 'pothole_sizes.txt'
+        self.pothole_file = 'pothole/result/pothole_sizes.txt'
+        file_directory = self.create_file_directory()
+        self.pothole_file = os.path.join(file_directory, 'pothole_sizes.txt')
+        self.file_handle = open(self.pothole_file, 'a')
             
-   
+    def create_file_directory(self):
+        file_directory = os.path.dirname(self.pothole_file)
+        if not os.path.exists(file_directory):
+            os.makedirs(file_directory)
+        return file_directory
     def image_callback(self, msg):
         try:
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -52,10 +58,7 @@ class ContourDetectionNode(Node):
             counts_msg = Int32()
             counts_msg.data = self.counts_over_time[-1]
             self.counts_publisher.publish(counts_msg)
-        if len(self.size_real_time) > 0:
-            counts_msg1 = Int32()
-            counts_msg1.data = int(self.size_real_time[-1])
-            self.size_publisher.publish(counts_msg1)
+
     def detect_magenta_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_magenta = np.array([140, 50, 50])
@@ -114,10 +117,13 @@ class ContourDetectionNode(Node):
                             if not too_close:
                                 # Store pothole number and size in a text file
                                 pothole_number = len(unique_pothole_numbers) + self.cumulative_count
+                                with open(f'pothole/pothole_sizes.txt', 'a') as file:
+                                    file.write(f"Pothole {pothole_number}: Size {size}\n")
+
                                 cv2.putText(result, f"Size: {size}",
                                             (center[0], center[1] - 20),
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                                self.size_real_time.append(size)
+
                                 contours_count += 1
                                 unique_contours.add(contour_tuple)
                                 unique_pothole_numbers.add(pothole_number)
@@ -137,7 +143,11 @@ class ContourDetectionNode(Node):
 
         self.cumulative_count += contours_count
         self.counts_over_time.append(self.cumulative_count)
-
+        for pothole_number in unique_pothole_numbers:
+            self.file_handle.write(f"Pothole {pothole_number}: Size {size}\n")
+            # cv2.putText(result, str(pothole_number),
+            #                             (center[0], center[1]),
+            #                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         return result
 
 
@@ -150,6 +160,12 @@ class ContourDetectionNode(Node):
         else:
             return None
 
+    def get_grid_coordinates(self, point):
+        #print(f"Original Point: {point}")
+        grid_x = int(point[0] / 10)  # Adjust grid cell size as needed
+        grid_y = int(point[1] / 10)
+        #print(f"Grid Coordinates: ({grid_x}, {grid_y})")
+        return grid_x, grid_y
 
     def camera_info_callback(self, msg):
         if not self.camera_model:
@@ -166,8 +182,7 @@ class ContourDetectionNode(Node):
         return self.counts_over_time
     def calculate_euclidean_distance(self, point1, point2):
         return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
-    def get_size_real_time(self):
-        return self.size_real_time
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -176,9 +191,7 @@ def main(args=None):
     rclpy.spin(contour_detection_node)
 
     counts_over_time = contour_detection_node.get_counts_over_time()
-    size_of_pothole = contour_detection_node.get_size_real_time()
     print(counts_over_time)
-    print(size_of_pothole)
 
     contour_detection_node.destroy_node()
     rclpy.shutdown()
