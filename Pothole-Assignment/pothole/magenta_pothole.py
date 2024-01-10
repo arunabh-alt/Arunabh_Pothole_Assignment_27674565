@@ -30,7 +30,7 @@ class ContourDetectionNode(Node):
         self.size_real_time = []
         self.tracker = cv2.TrackerKCF_create()
         self.current_potholes = []
-        self.occupancy_grid = np.zeros((500, 500), dtype=np.uint8)  # Adjust the grid size as needed
+        #self.occupancy_grid = np.zeros((500, 500), dtype=np.uint8)  # Adjust the grid size as needed
         
             
    
