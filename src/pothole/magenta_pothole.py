@@ -64,9 +64,8 @@ class ContourDetectionNode(Node):
         upper_magenta = np.array([170, 255, 255])
         mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        result = image.copy()
         unique_pothole_numbers = set()
+        result = image.copy()
         contours_count = 0
         unique_contours = set()
 
@@ -107,25 +106,28 @@ class ContourDetectionNode(Node):
                             # Calculate pothole size
                             size = cv2.contourArea(contour)
 
-                            # Store pothole number and size in a text file
-                            pothole_number = contours_count + self.cumulative_count
-                            with open(f'pothole/pothole_sizes.txt', 'a') as file:
-                                file.write(f"Pothole {pothole_number}: Size {size}\n")
+                            # Check distance to previously detected potholes
+                            too_close = False
+                            for pothole in self.current_potholes:
+                                if self.calculate_euclidean_distance(center, self.get_contour_center(pothole['contour'])) < 38:  # Adjust the distance threshold as needed
+                                    too_close = True
+                                    break
 
-                            cv2.putText(result, f"Size: {size}",
-                                        (center[0], center[1] - 20),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                            if not too_close:
+                                # Store pothole number and size in a text file
+                                pothole_number = len(unique_pothole_numbers) + self.cumulative_count
+                                with open(f'pothole/pothole_sizes.txt', 'a') as file:
+                                    file.write(f"Pothole {pothole_number}: Size {size}\n")
 
-                            contours_count += 1
-                            pothole_number = contours_count + self.cumulative_count
+                                cv2.putText(result, f"Size: {size}",
+                                            (center[0], center[1] - 20),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-                            cv2.putText(result, str(pothole_number),
-                                        (center[0], center[1]),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                                contours_count += 1
+                                unique_contours.add(contour_tuple)
+                                unique_pothole_numbers.add(pothole_number)
+                                self.current_potholes.append({'contour': contour.copy(), 'tracked': True})
 
-                            unique_contours.add(contour_tuple)
-                            unique_pothole_numbers.add(pothole_number)
-                            self.current_potholes.append({'contour': contour.copy(), 'tracked': True})
 
         for pothole in self.current_potholes:
             if not pothole['tracked']:
@@ -142,7 +144,9 @@ class ContourDetectionNode(Node):
         self.counts_over_time.append(self.cumulative_count)
         for pothole_number in unique_pothole_numbers:
             self.file_handle.write(f"Pothole {pothole_number}: Size {size}\n")
-
+            # cv2.putText(result, str(pothole_number),
+            #                             (center[0], center[1]),
+            #                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         return result
 
 
@@ -156,10 +160,10 @@ class ContourDetectionNode(Node):
             return None
 
     def get_grid_coordinates(self, point):
-        print(f"Original Point: {point}")
+        #print(f"Original Point: {point}")
         grid_x = int(point[0] / 10)  # Adjust grid cell size as needed
         grid_y = int(point[1] / 10)
-        print(f"Grid Coordinates: ({grid_x}, {grid_y})")
+        #print(f"Grid Coordinates: ({grid_x}, {grid_y})")
         return grid_x, grid_y
 
     def camera_info_callback(self, msg):
@@ -175,6 +179,8 @@ class ContourDetectionNode(Node):
 
     def get_counts_over_time(self):
         return self.counts_over_time
+    def calculate_euclidean_distance(self, point1, point2):
+        return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 def main(args=None):
     rclpy.init(args=args)
