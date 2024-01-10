@@ -24,8 +24,8 @@ setup(
             'mover = pothole.mover:main',
             'test = pothole.test:main',
             'magenta_pothole = pothole.magenta_pothole:main',
-            'yolo = pothole.yolo:main',
-            'ff = pothole.ff:main'
+            'yolo = pothole.yolo:main'
+            
         ],
     },
 )
