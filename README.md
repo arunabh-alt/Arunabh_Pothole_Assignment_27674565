@@ -15,7 +15,7 @@ Explore the detailed documentation and guidelines in the [Wiki](https://github.c
 
 ## Project Structure
 
-The main code and packages are in the `src` folder. The `src` folder contains `pothole`,`resource`,`test` folders and `package.xml`, `setup.cfg`,`setup.py` files. Here the main project codebase are available in the `pothole` folder. The LIMO Robot codebase is organized in the `src/path/to/submodule` directory. For detailed specifications, refer to this path.
+The main code and packages are in the `Pothole-Assignment` folder. This folder contains `pothole`,`resource`,`test` folders and `package.xml`, `setup.cfg`,`setup.py` files. Here the main project codebase are available in the `pothole` folder. 
 
 ## ROS2-based Python Files
 
