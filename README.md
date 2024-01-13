@@ -52,9 +52,9 @@ To explore the codebase and run the assignment, follow these steps:
 
 ## Simulation 
 ### Launch Gazebo
-    ```bash
+    
     git clone https://github.com/LCAS/CMP9767_LIMO.git
     ros2 launch limo_gazebosim limo_gazebo_diff.launch.py world:=src/CMP9767_LIMO/assignment_template/worlds/potholes_simple.world
 ### Launch Rviz
-    ```bash
+    
     ros2 launch limo_navigation limo_navigation.launch.py use_sim_time:=true map:=src/CMP9767_LIMO/assignment_template/maps/potholes_20mm.yaml params_file:=src/CMP9767_LIMO/assignment_template/params/nav2_params.yaml
