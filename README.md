@@ -7,7 +7,7 @@ This repository hosts the source code for my robotics programming assignment, im
 1. [Wiki](#wiki)
 2. [Project Structure](#project-structure)
 3. [Getting Started](#getting-started)
-4. [Contributing](#contributing)
+
 
 ## Wiki
 
