@@ -49,9 +49,9 @@ class ContourDetectionNode(Node):
 
     def detect_grey_contours(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_magenta = np.array([0, 0, 42])
-        upper_magenta = np.array([15, 15, 57])
-        mask = cv2.inRange(hsv, lower_magenta, upper_magenta)
+        lower_grey = np.array([0, 0, 42])
+        upper_grey = np.array([15, 15, 57])
+        mask = cv2.inRange(hsv, lower_grey, upper_grey)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         filtered_contours = []
